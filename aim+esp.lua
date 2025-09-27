@@ -1,4 +1,4 @@
--- UltraSharp Roblox Cheat v6.0 (ESP + Smart Aimbot)
+-- UltraSharp Roblox Cheat v6.1 (Исправленный FOV)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -12,13 +12,13 @@ local SharpESP = {
     Distance = {}
 }
 
--- Умный аимбот с проверкой стен
+-- Умный аимбот с исправленным FOV
 local SmartAimbot = {
     Target = nil,
-    Smoothness = 0.01, -- Очень резкий
-    FOV = math.huge, -- Угол обзора
+    Smoothness = 0.02, -- Очень резкий
+    FOV = 500, -- Исправлено: разумное значение вместо math.huge
     TargetPart = "Head",
-    WallCheck = true -- Проверка стен
+    WallCheck = true
 }
 
 -- Проверка видимости через Raycast
@@ -28,17 +28,14 @@ function IsVisible(targetPart)
     local cameraPos = Camera.CFrame.Position
     local targetPos = targetPart.Position
     
-    -- Raycast для проверки препятствий
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
     
     local raycastResult = Workspace:Raycast(cameraPos, (targetPos - cameraPos), raycastParams)
     
-    -- Если луч уперся в препятствие - цель не видна
     if raycastResult then
         local hitPart = raycastResult.Instance
-        -- Проверяем, попали ли мы в цель или в препятствие
         if hitPart and hitPart:IsDescendantOf(targetPart.Parent) then
             return true
         else
@@ -77,7 +74,6 @@ function CreateSharpESP(player)
     SharpESP.Names[player] = name
     SharpESP.Distance[player] = distance
     
-    -- Обновление ESP каждый кадр
     RunService.RenderStepped:Connect(function()
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local root = player.Character.HumanoidRootPart
@@ -87,11 +83,9 @@ function CreateSharpESP(player)
                 local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
                 
                 if onScreen then
-                    -- Проверка видимости для ESP
                     local visible = IsVisible(head)
                     local espColor = visible and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
                     
-                    -- Резкое отображение без задержек
                     local scale = 2000 / pos.Z
                     box.Size = Vector2.new(scale, scale * 1.5)
                     box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
@@ -120,12 +114,11 @@ function CreateSharpESP(player)
     end)
 end
 
--- Умный аимбот с проверкой стен
+-- Умный аимбот с исправленной логикой FOV
 function SmartAimbotLoop()
     RunService.RenderStepped:Connect(function()
-        -- Поиск ближайшей видимой цели
         local closest = nil
-        local closestDist = math.huge
+        local closestDist = SmartAimbot.FOV -- Теперь используем FOV как максимальное расстояние
         
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
@@ -134,14 +127,14 @@ function SmartAimbotLoop()
                 local head = player.Character:FindFirstChild("Head")
                 
                 if humanoid and humanoid.Health > 0 and root and head then
-                    -- Проверка на видимость
-                    if IsVisible(head) then
-                        local screenPos = Camera:WorldToViewportPoint(root.Position)
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                    
+                    if onScreen and IsVisible(head) then
                         local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
                         local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                         
-                        -- Проверка угла обзора
-                        if dist < SmartAimbot.FOV and dist < closestDist then
+                        -- Исправленная логика: ищем ближайшую цель в пределах FOV
+                        if dist < closestDist then
                             closestDist = dist
                             closest = player
                         end
@@ -150,14 +143,12 @@ function SmartAimbotLoop()
             end
         end
         
-        -- Резкое прицеливание только на видимые цели
         if closest and closest.Character then
             local targetPart = closest.Character:FindFirstChild(SmartAimbot.TargetPart)
             if targetPart and IsVisible(targetPart) then
                 local currentCF = Camera.CFrame
                 local targetPos = targetPart.Position
                 
-                -- Ультра-резкое наведение
                 local newCF = CFrame.lookAt(currentCF.Position, targetPos)
                 Camera.CFrame = currentCF:Lerp(newCF, SmartAimbot.Smoothness)
             end
@@ -182,8 +173,6 @@ end)
 -- Запуск систем
 SmartAimbotLoop()
 
-print("🎯 УМНЫЙ АИМБОТ АКТИВИРОВАН")
+print("🎯 АИМБОТ АКТИВИРОВАН (ИСПРАВЛЕННЫЙ FOV)")
 print("📡 ESP С ПРОВЕРКОЙ СТЕН")
-print("🔴 КРАСНЫЙ - ЗА ПРЕГРАДОЙ")
-print("🟢 ЗЕЛЕНЫЙ - ВИДИМЫЙ")
-print("⚡ РЕЖИМ: МАКСИМАЛЬНАЯ РЕЗКОСТЬ")
+print("⚡ FOV: 500 (ОПТИМАЛЬНЫЙ)")
