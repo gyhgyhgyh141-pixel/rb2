@@ -1,8 +1,9 @@
--- UltraSharp Roblox Cheat v5.0 (ESP + Aimbot Only)
+-- UltraSharp Roblox Cheat v6.0 (ESP + Smart Aimbot)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 -- Ультра-резкий ESP
 local SharpESP = {
@@ -11,12 +12,42 @@ local SharpESP = {
     Distance = {}
 }
 
--- Резкий аимбот с мгновенным откликом на любом расстоянии
-local SharpAimbot = {
+-- Умный аимбот с проверкой стен
+local SmartAimbot = {
     Target = nil,
-    Smoothness = 0.05,
-    TargetPart = "Head"
+    Smoothness = 0.01, -- Очень резкий
+    FOV = math.huge, -- Угол обзора
+    TargetPart = "Head",
+    WallCheck = true -- Проверка стен
 }
+
+-- Проверка видимости через Raycast
+function IsVisible(targetPart)
+    if not SmartAimbot.WallCheck then return true end
+    
+    local cameraPos = Camera.CFrame.Position
+    local targetPos = targetPart.Position
+    
+    -- Raycast для проверки препятствий
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    
+    local raycastResult = Workspace:Raycast(cameraPos, (targetPos - cameraPos), raycastParams)
+    
+    -- Если луч уперся в препятствие - цель не видна
+    if raycastResult then
+        local hitPart = raycastResult.Instance
+        -- Проверяем, попали ли мы в цель или в препятствие
+        if hitPart and hitPart:IsDescendantOf(targetPart.Parent) then
+            return true
+        else
+            return false
+        end
+    end
+    
+    return true
+end
 
 -- Ультра-резкий ESP рендеринг
 function CreateSharpESP(player)
@@ -56,10 +87,15 @@ function CreateSharpESP(player)
                 local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
                 
                 if onScreen then
+                    -- Проверка видимости для ESP
+                    local visible = IsVisible(head)
+                    local espColor = visible and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                    
                     -- Резкое отображение без задержек
                     local scale = 2000 / pos.Z
                     box.Size = Vector2.new(scale, scale * 1.5)
                     box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
+                    box.Color = espColor
                     box.Visible = true
                     
                     name.Text = player.Name
@@ -84,10 +120,10 @@ function CreateSharpESP(player)
     end)
 end
 
--- Резкий аимбот с мгновенным прицеливанием на любом расстоянии
-function SharpAimbotLoop()
+-- Умный аимбот с проверкой стен
+function SmartAimbotLoop()
     RunService.RenderStepped:Connect(function()
-        -- Поиск ближайшей цели без ограничений по расстоянию
+        -- Поиск ближайшей видимой цели
         local closest = nil
         local closestDist = math.huge
         
@@ -95,28 +131,35 @@ function SharpAimbotLoop()
             if player ~= LocalPlayer and player.Character then
                 local humanoid = player.Character:FindFirstChild("Humanoid")
                 local root = player.Character:FindFirstChild("HumanoidRootPart")
+                local head = player.Character:FindFirstChild("Head")
                 
-                if humanoid and humanoid.Health > 0 and root then
-                    local dist = (root.Position - Camera.CFrame.Position).Magnitude
-                    
-                    if dist < closestDist then
-                        closestDist = dist
-                        closest = player
+                if humanoid and humanoid.Health > 0 and root and head then
+                    -- Проверка на видимость
+                    if IsVisible(head) then
+                        local screenPos = Camera:WorldToViewportPoint(root.Position)
+                        local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        
+                        -- Проверка угла обзора
+                        if dist < SmartAimbot.FOV and dist < closestDist then
+                            closestDist = dist
+                            closest = player
+                        end
                     end
                 end
             end
         end
         
-        -- Мгновенное прицеливание на любом расстоянии
+        -- Резкое прицеливание только на видимые цели
         if closest and closest.Character then
-            local targetPart = closest.Character:FindFirstChild(SharpAimbot.TargetPart)
-            if targetPart then
+            local targetPart = closest.Character:FindFirstChild(SmartAimbot.TargetPart)
+            if targetPart and IsVisible(targetPart) then
                 local currentCF = Camera.CFrame
                 local targetPos = targetPart.Position
                 
                 -- Ультра-резкое наведение
                 local newCF = CFrame.lookAt(currentCF.Position, targetPos)
-                Camera.CFrame = currentCF:Lerp(newCF, SharpAimbot.Smoothness)
+                Camera.CFrame = currentCF:Lerp(newCF, SmartAimbot.Smoothness)
             end
         end
     end)
@@ -137,7 +180,10 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 -- Запуск систем
-SharpAimbotLoop()
+SmartAimbotLoop()
 
-print("🎯 АИМБОТ АКТИВИРОВАН (РАБОТАЕТ НА ЛЮБОМ РАССТОЯНИИ)")
-print("📡 ESP АКТИВИРОВАН")
+print("🎯 УМНЫЙ АИМБОТ АКТИВИРОВАН")
+print("📡 ESP С ПРОВЕРКОЙ СТЕН")
+print("🔴 КРАСНЫЙ - ЗА ПРЕГРАДОЙ")
+print("🟢 ЗЕЛЕНЫЙ - ВИДИМЫЙ")
+print("⚡ РЕЖИМ: МАКСИМАЛЬНАЯ РЕЗКОСТЬ")
