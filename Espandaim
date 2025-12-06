@@ -11,7 +11,7 @@ local SETTINGS = {
         ENABLED = true,        -- Включить аимбот
         SMOOTHNESS = 0.15,      -- Плавность (0.1 - резко, 0.3 - плавно)
         FOV = 150,              -- Радиус поиска цели (в пикселях)
-        WALL_CHECK = false,     -- Проверка стен (true = не цепляться сквозь стены, false = цепляться сквозь стены)
+        WALL_CHECK = true,     -- Проверка стен (true = не цепляться сквозь стены, false = цепляться сквозь стены)
         TARGET_PART = "Head"    -- Часть тела для прицеливания (Head, HumanoidRootPart, Torso)
     },
     ESP = {
