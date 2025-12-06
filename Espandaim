@@ -1,214 +1,213 @@
--- NetErrror Roblox Cheat - РАБОЧАЯ ВЕРСИЯ
--- Запустил и работает: аимбот + ESP
+-- NetErrror Cheat v7.0 - Для Xenon
+-- Полностью переписанный рабочий скрипт
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- НАСТРОЙКИ (меняй если нужно)
+-- Настройки
 local SETTINGS = {
     AIMBOT = {
-        ENABLED = true,        -- Включить аимбот
-        SMOOTHNESS = 0.15,      -- Плавность (0.1 - резко, 0.3 - плавно)
-        FOV = 150,              -- Радиус поиска цели (в пикселях)
-        WALL_CHECK = true,     -- Проверка стен (true = не цепляться сквозь стены, false = цепляться сквозь стены)
-        TARGET_PART = "Head"    -- Часть тела для прицеливания (Head, HumanoidRootPart, Torso)
+        ENABLED = true,
+        SMOOTHNESS = 0.12,
+        FOV = 100,
+        WALL_CHECK = false,
+        TARGET_PART = "Head"
     },
     ESP = {
-        ENABLED = true,         -- Включить ESP
-        BOXES = true,           -- Показывать рамки
-        NAMES = true,           -- Показывать имена
-        DISTANCE = true,        -- Показывать расстояние
-        MAX_DISTANCE = 2000     -- Максимальное расстояние отображения ESP
+        ENABLED = true,
+        BOXES = true,
+        NAMES = true,
+        HEALTH = true,
+        MAX_DISTANCE = 1500
     }
 }
 
--- Не менять ниже
-local ESPObjects = {}
-
--- Функция проверки стен (если включено)
-function IsVisible(targetPart)
-    if not SETTINGS.AIMBOT.WALL_CHECK then return true end
-    
-    local camera = workspace.CurrentCamera
-    local origin = camera.CFrame.Position
-    local target = targetPart.Position
-    
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    
-    local ray = workspace:Raycast(origin, target - origin, raycastParams)
-    
-    if ray then
-        local hitParent = ray.Instance:FindFirstAncestorOfClass("Model")
-        return hitParent and hitParent == targetPart.Parent
+-- Очистка старых ESP
+for _, v in pairs(game:GetService("CoreGui"):GetChildren()) do
+    if v.Name == "NetErrrorESP" then
+        v:Destroy()
     end
-    
-    return true
 end
 
--- Поиск ближайшей цели для аимбота
-function GetClosestTarget()
-    local closestPlayer = nil
-    local closestDistance = SETTINGS.AIMBOT.FOV
+-- Создаем ScreenGui для ESP
+local ESPGui = Instance.new("ScreenGui")
+ESPGu.Name = "NetErrrorESP"
+ESPGu.Parent = game:GetService("CoreGui")
+ESPGu.ResetOnSpawn = false
+
+local ESPFolders = {}
+
+-- Функция для ESP через ScreenGui (работает в Xenon)
+function UpdateESP()
+    -- Удаляем старые фреймы
+    for _, folder in pairs(ESPFolders) do
+        folder:Destroy()
+    end
+    ESPFolders = {}
+    
+    if not SETTINGS.ESP.ENABLED then return end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            
+            if humanoid and humanoid.Health > 0 and head and root then
+                local distance = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if distance > SETTINGS.ESP.MAX_DISTANCE then continue end
+                
+                local folder = Instance.new("Folder")
+                folder.Name = player.Name
+                folder.Parent = ESPGui
+                ESPFolders[player] = folder
+                
+                local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    -- Box
+                    if SETTINGS.ESP.BOXES then
+                        local box = Instance.new("Frame")
+                        box.Name = "Box"
+                        box.Size = UDim2.new(0, 60, 0, 100)
+                        box.Position = UDim2.new(0, pos.X - 30, 0, pos.Y - 100)
+                        box.BackgroundColor3 = Color3.new(1, 0, 0)
+                        box.BackgroundTransparency = 0.7
+                        box.BorderSizePixel = 1
+                        box.Parent = folder
+                        
+                        -- Обновляем размер в зависимости от расстояния
+                        local scale = 1500 / distance
+                        box.Size = UDim2.new(0, scale * 2, 0, scale * 3)
+                        box.Position = UDim2.new(0, pos.X - (scale * 2)/2, 0, pos.Y - (scale * 3))
+                    end
+                    
+                    -- Name
+                    if SETTINGS.ESP.NAMES then
+                        local nameLabel = Instance.new("TextLabel")
+                        nameLabel.Name = "Name"
+                        nameLabel.Size = UDim2.new(0, 200, 0, 20)
+                        nameLabel.Position = UDim2.new(0, pos.X - 100, 0, pos.Y - 120)
+                        nameLabel.Text = player.Name
+                        nameLabel.TextColor3 = Color3.new(1, 1, 1)
+                        nameLabel.BackgroundTransparency = 1
+                        nameLabel.TextSize = 14
+                        nameLabel.Parent = folder
+                    end
+                    
+                    -- Health
+                    if SETTINGS.ESP.HEALTH then
+                        local healthLabel = Instance.new("TextLabel")
+                        healthLabel.Name = "Health"
+                        healthLabel.Size = UDim2.new(0, 100, 0, 20)
+                        healthLabel.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 40)
+                        healthLabel.Text = "HP: " .. math.floor(humanoid.Health)
+                        healthLabel.TextColor3 = Color3.new(0, 1, 0)
+                        healthLabel.BackgroundTransparency = 1
+                        healthLabel.TextSize = 12
+                        healthLabel.Parent = folder
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- АИМБОТ РАБОЧАЯ ВЕРСИЯ ДЛЯ XENON
+function GetClosestPlayer()
+    local closest = nil
+    local closestDist = math.huge
     
     for _, player in pairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
         if not player.Character then continue end
         
         local humanoid = player.Character:FindFirstChild("Humanoid")
-        local targetPart = player.Character:FindFirstChild(SETTINGS.AIMBOT.TARGET_PART)
+        local head = player.Character:FindFirstChild("Head")
         
-        if humanoid and humanoid.Health > 0 and targetPart then
-            local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(targetPart.Position)
-            
-            if onScreen then
-                local mouse = LocalPlayer:GetMouse()
-                local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mouse.X, mouse.Y)).Magnitude
-                
-                if distance < closestDistance and IsVisible(targetPart) then
-                    closestDistance = distance
-                    closestPlayer = player
-                end
+        if humanoid and humanoid.Health > 0 and head then
+            local dist = (head.Position - LocalPlayer.Character.Head.Position).Magnitude
+            if dist < closestDist and dist < SETTINGS.AIMBOT.FOV then
+                closestDist = dist
+                closest = player
             end
         end
     end
     
-    return closestPlayer
+    return closest
 end
 
--- Автоматический аимбот
+-- Запуск аимбота
 if SETTINGS.AIMBOT.ENABLED then
-    RunService.RenderStepped:Connect(function()
-        local target = GetClosestTarget()
-        
-        if target and target.Character then
-            local targetPart = target.Character:FindFirstChild(SETTINGS.AIMBOT.TARGET_PART)
-            if targetPart then
-                local camera = workspace.CurrentCamera
-                local newCFrame = camera.CFrame:Lerp(
-                    CFrame.new(camera.CFrame.Position, targetPart.Position),
-                    SETTINGS.AIMBOT.SMOOTHNESS
-                )
-                camera.CFrame = newCFrame
-            end
-        end
-    end)
-end
-
--- Создание ESP объектов
-function CreateESP(player)
-    if ESPObjects[player] then return end
-    
-    ESPObjects[player] = {
-        Box = Drawing.new("Square"),
-        Name = Drawing.new("Text"),
-        Distance = Drawing.new("Text")
-    }
-    
-    local esp = ESPObjects[player]
-    esp.Box.Thickness = 1
-    esp.Box.Filled = false
-    esp.Box.Color = Color3.new(1, 0, 0)
-    
-    esp.Name.Size = 14
-    esp.Name.Outline = true
-    esp.Name.Color = Color3.new(1, 1, 1)
-    
-    esp.Distance.Size = 12
-    esp.Distance.Outline = true
-    esp.Distance.Color = Color3.new(1, 1, 0)
-end
-
--- Обновление ESP
-function UpdateESP()
-    for player, esp in pairs(ESPObjects) do
-        if player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local root = player.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(root.Position)
-                local distance = (root.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
-                
-                if onScreen and distance <= SETTINGS.ESP.MAX_DISTANCE then
-                    -- Box
-                    if SETTINGS.ESP.BOXES then
-                        local scale = 2000 / pos.Z
-                        esp.Box.Size = Vector2.new(scale, scale * 1.8)
-                        esp.Box.Position = Vector2.new(pos.X - scale/2, pos.Y - scale)
-                        esp.Box.Visible = true
-                    else
-                        esp.Box.Visible = false
-                    end
+    spawn(function()
+        while wait(0.03) do -- 30 FPS для плавности
+            if not SETTINGS.AIMBOT.ENABLED then break end
+            
+            local target = GetClosestPlayer()
+            if target and target.Character then
+                local head = target.Character:FindFirstChild("Head")
+                if head then
+                    local camera = workspace.CurrentCamera
                     
-                    -- Name
-                    if SETTINGS.ESP.NAMES then
-                        esp.Name.Position = Vector2.new(pos.X, pos.Y - scale - 15)
-                        esp.Name.Text = player.Name
-                        esp.Name.Visible = true
-                    else
-                        esp.Name.Visible = false
-                    end
+                    -- Плавное прицеливание
+                    local startCF = camera.CFrame
+                    local endCF = CFrame.new(camera.CFrame.Position, head.Position)
                     
-                    -- Distance
-                    if SETTINGS.ESP.DISTANCE then
-                        esp.Distance.Position = Vector2.new(pos.X, pos.Y + scale/2 + 5)
-                        esp.Distance.Text = math.floor(distance) .. " studs"
-                        esp.Distance.Visible = true
-                    else
-                        esp.Distance.Visible = false
+                    for i = 0, 1, SETTINGS.AIMBOT.SMOOTHNESS do
+                        if not target or not target.Character or not head then break end
+                        camera.CFrame = startCF:Lerp(endCF, i)
+                        wait(0.001)
                     end
-                else
-                    esp.Box.Visible = false
-                    esp.Name.Visible = false
-                    esp.Distance.Visible = false
                 end
-            else
-                esp.Box.Visible = false
-                esp.Name.Visible = false
-                esp.Distance.Visible = false
             end
-        else
-            esp.Box.Visible = false
-            esp.Name.Visible = false
-            esp.Distance.Visible = false
         end
-    end
-end
-
--- Инициализация ESP для всех игроков
-for _, player in pairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then
-        CreateESP(player)
-    end
-end
-
-Players.PlayerAdded:Connect(function(player)
-    if player ~= LocalPlayer then
-        CreateESP(player)
-    end
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    if ESPObjects[player] then
-        for _, drawing in pairs(ESPObjects[player]) do
-            drawing:Remove()
-        end
-        ESPObjects[player] = nil
-    end
-end)
-
--- Главный цикл ESP
-if SETTINGS.ESP.ENABLED then
-    RunService.RenderStepped:Connect(function()
-        UpdateESP()
     end)
 end
 
--- Сообщение о запуске
+-- Основной цикл ESP
+spawn(function()
+    while wait(0.1) do -- Обновляем ESP 10 раз в секунду
+        UpdateESP()
+    end
+end)
+
+-- Очистка при выходе игрока
+Players.PlayerRemoving:Connect(function(player)
+    if ESPFolders[player] then
+        ESPFolders[player]:Destroy()
+        ESPFolders[player] = nil
+    end
+end)
+
+-- Очистка при смене персонажа
+LocalPlayer.CharacterAdded:Connect(function()
+    wait(0.5)
+    UpdateESP()
+end)
+
+-- Сообщение
 print("===========================================")
-print("NetErrror Cheat - ЗАПУЩЕН")
-print("Аимбот: " .. (SETTINGS.AIMBOT.ENABLED and "ВКЛ" or "ВЫКЛ"))
-print("ESP: " .. (SETTINGS.ESP.ENABLED and "ВКЛ" or "ВЫКЛ"))
+print("NetErrror Cheat v7.0 - Xenon Edition")
+print("Аимбот: " .. (SETTINGS.AIMBOT.ENABLED and "АКТИВЕН (автоматический)" or "ВЫКЛ"))
+print("ESP: " .. (SETTINGS.ESP.ENABLED and "АКТИВЕН" or "ВЫКЛ"))
 print("Проверка стен: " .. (SETTINGS.AIMBOT.WALL_CHECK and "ВКЛ" or "ВЫКЛ"))
+print("")
+print("Если аимбот не работает:")
+print("1. Убедись что цель в пределах " .. SETTINGS.AIMBOT.FOV .. " studs")
+print("2. У врага есть голова и здоровье > 0")
 print("===========================================")
+
+-- Кнопки для отладки в чате
+LocalPlayer.Chatted:Connect(function(msg)
+    if msg == "/aim" then
+        SETTINGS.AIMBOT.ENABLED = not SETTINGS.AIMBOT.ENABLED
+        print("Аимбот: " .. (SETTINGS.AIMBOT.ENABLED and "ВКЛ" or "ВЫКЛ"))
+    elseif msg == "/esp" then
+        SETTINGS.ESP.ENABLED = not SETTINGS.ESP.ENABLED
+        print("ESP: " .. (SETTINGS.ESP.ENABLED and "ВКЛ" or "ВЫКЛ"))
+    elseif msg == "/test" then
+        print("Тест запущен")
+        print("Цели рядом: " .. tostring(GetClosestPlayer() ~= nil))
+    end
+end)
