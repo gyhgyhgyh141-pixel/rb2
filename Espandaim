@@ -1,50 +1,38 @@
--- NetErrror Roblox Cheat Script v6.0 - Авто-аимбот + GUI
--- Аимбот работает автоматически, ESP включается/выключается через GUI
-
--- Автозагрузка Rayfield GUI библиотеки
-if not Rayfield then
-    local RayfieldLoad = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua'))()
-    Rayfield = RayfieldLoad()
-end
+-- NetErrror Roblox Cheat - РАБОЧАЯ ВЕРСИЯ
+-- Запустил и работает: аимбот + ESP
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 
--- Настройки по умолчанию
-local Settings = {
-    Aimbot = {
-        Enabled = true,  -- ВКЛЮЧЕН ПО УМОЛЧАНИЮ
-        AutoAim = true,   -- АВТО-АИМБОТ (без клавиши)
-        Smoothness = 0.25, -- Более плавно
-        FOV = 120,        -- Большой FOV
-        TeamCheck = true,
-        WallCheck = true,
-        TargetPart = "Head"
+-- НАСТРОЙКИ (меняй если нужно)
+local SETTINGS = {
+    AIMBOT = {
+        ENABLED = true,        -- Включить аимбот
+        SMOOTHNESS = 0.15,      -- Плавность (0.1 - резко, 0.3 - плавно)
+        FOV = 150,              -- Радиус поиска цели (в пикселях)
+        WALL_CHECK = false,     -- Проверка стен (true = не цепляться сквозь стены, false = цепляться сквозь стены)
+        TARGET_PART = "Head"    -- Часть тела для прицеливания (Head, HumanoidRootPart, Torso)
     },
     ESP = {
-        Enabled = true,   -- ВКЛЮЧЕН ПО УМОЛЧАНИЮ
-        Boxes = true,
-        Names = true,
-        Distance = true,
-        Health = true,
-        Tracers = false,
-        TeamColor = true,
-        MaxDistance = 1500
+        ENABLED = true,         -- Включить ESP
+        BOXES = true,           -- Показывать рамки
+        NAMES = true,           -- Показывать имена
+        DISTANCE = true,        -- Показывать расстояние
+        MAX_DISTANCE = 2000     -- Максимальное расстояние отображения ESP
     }
 }
 
-local CurrentTarget = nil
+-- Не менять ниже
 local ESPObjects = {}
 
--- Функция проверки видимости через Raycast
-function IsVisible(part)
-    if not Settings.Aimbot.WallCheck then return true end
+-- Функция проверки стен (если включено)
+function IsVisible(targetPart)
+    if not SETTINGS.AIMBOT.WALL_CHECK then return true end
     
     local camera = workspace.CurrentCamera
     local origin = camera.CFrame.Position
-    local target = part.Position
+    local target = targetPart.Position
     
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -54,430 +42,139 @@ function IsVisible(part)
     
     if ray then
         local hitParent = ray.Instance:FindFirstAncestorOfClass("Model")
-        return hitParent and hitParent == part.Parent
+        return hitParent and hitParent == targetPart.Parent
     end
     
     return true
 end
 
--- Функция поиска цели (АВТОМАТИЧЕСКАЯ)
-function FindTarget()
-    if not Settings.Aimbot.Enabled or not Settings.Aimbot.AutoAim then return nil end
-    
-    local closest = nil
-    local closestDistance = Settings.Aimbot.FOV
+-- Поиск ближайшей цели для аимбота
+function GetClosestTarget()
+    local closestPlayer = nil
+    local closestDistance = SETTINGS.AIMBOT.FOV
     
     for _, player in pairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
-        if Settings.Aimbot.TeamCheck and player.Team == LocalPlayer.Team then continue end
         if not player.Character then continue end
         
         local humanoid = player.Character:FindFirstChild("Humanoid")
-        local targetPart = player.Character:FindFirstChild(Settings.Aimbot.TargetPart)
+        local targetPart = player.Character:FindFirstChild(SETTINGS.AIMBOT.TARGET_PART)
         
         if humanoid and humanoid.Health > 0 and targetPart then
             local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(targetPart.Position)
             
-            if onScreen and IsVisible(targetPart) then
-                local mousePos = Vector2.new(Mouse.X, Mouse.Y)
-                local targetPos = Vector2.new(screenPos.X, screenPos.Y)
-                local distance = (mousePos - targetPos).Magnitude
+            if onScreen then
+                local mouse = LocalPlayer:GetMouse()
+                local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mouse.X, mouse.Y)).Magnitude
                 
-                if distance < closestDistance then
+                if distance < closestDistance and IsVisible(targetPart) then
                     closestDistance = distance
-                    closest = player
+                    closestPlayer = player
                 end
             end
         end
     end
     
-    return closest
+    return closestPlayer
 end
 
--- АВТО-АИМБОТ (работает всегда без нажатия кнопок)
-local AimbotConnection
-function UpdateAimbot()
-    if AimbotConnection then
-        AimbotConnection:Disconnect()
-        AimbotConnection = nil
-    end
-    
-    if Settings.Aimbot.Enabled and Settings.Aimbot.AutoAim then
-        AimbotConnection = RunService.RenderStepped:Connect(function()
-            CurrentTarget = FindTarget()
-            
-            if CurrentTarget and CurrentTarget.Character then
-                local targetPart = CurrentTarget.Character:FindFirstChild(Settings.Aimbot.TargetPart)
-                if targetPart and IsVisible(targetPart) then
-                    local camera = workspace.CurrentCamera
-                    local targetPos = targetPart.Position
-                    local currentPos = camera.CFrame.Position
-                    
-                    local newCFrame = CFrame.new(
-                        currentPos,
-                        targetPos
-                    ):Lerp(camera.CFrame, 1 - Settings.Aimbot.Smoothness)
-                    
-                    camera.CFrame = newCFrame
-                end
+-- Автоматический аимбот
+if SETTINGS.AIMBOT.ENABLED then
+    RunService.RenderStepped:Connect(function()
+        local target = GetClosestTarget()
+        
+        if target and target.Character then
+            local targetPart = target.Character:FindFirstChild(SETTINGS.AIMBOT.TARGET_PART)
+            if targetPart then
+                local camera = workspace.CurrentCamera
+                local newCFrame = camera.CFrame:Lerp(
+                    CFrame.new(camera.CFrame.Position, targetPart.Position),
+                    SETTINGS.AIMBOT.SMOOTHNESS
+                )
+                camera.CFrame = newCFrame
             end
-        end)
-    end
+        end
+    end)
 end
 
--- ESP система
+-- Создание ESP объектов
 function CreateESP(player)
     if ESPObjects[player] then return end
     
     ESPObjects[player] = {
         Box = Drawing.new("Square"),
         Name = Drawing.new("Text"),
-        Distance = Drawing.new("Text"),
-        Health = Drawing.new("Text"),
-        Tracer = Drawing.new("Line")
+        Distance = Drawing.new("Text")
     }
     
     local esp = ESPObjects[player]
     esp.Box.Thickness = 1
     esp.Box.Filled = false
+    esp.Box.Color = Color3.new(1, 0, 0)
     
     esp.Name.Size = 14
     esp.Name.Outline = true
-    esp.Name.Center = true
+    esp.Name.Color = Color3.new(1, 1, 1)
     
     esp.Distance.Size = 12
     esp.Distance.Outline = true
-    esp.Distance.Center = true
-    
-    esp.Health.Size = 12
-    esp.Health.Outline = true
-    esp.Health.Center = true
-    
-    esp.Tracer.Thickness = 1
+    esp.Distance.Color = Color3.new(1, 1, 0)
 end
 
+-- Обновление ESP
 function UpdateESP()
-    if not Settings.ESP.Enabled then
-        for _, esp in pairs(ESPObjects) do
-            esp.Box.Visible = false
-            esp.Name.Visible = false
-            esp.Distance.Visible = false
-            esp.Health.Visible = false
-            esp.Tracer.Visible = false
-        end
-        return
-    end
-    
     for player, esp in pairs(ESPObjects) do
         if player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
             local root = player.Character:FindFirstChild("HumanoidRootPart")
-            local head = player.Character:FindFirstChild("Head")
-            
-            if root and head then
+            if root then
                 local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(root.Position)
                 local distance = (root.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
                 
-                if onScreen and distance <= Settings.ESP.MaxDistance then
-                    local color
-                    if Settings.ESP.TeamColor and player.Team then
-                        color = player.Team.TeamColor.Color
-                    else
-                        color = Color3.fromRGB(255, 0, 0)
-                    end
-                    
+                if onScreen and distance <= SETTINGS.ESP.MAX_DISTANCE then
                     -- Box
-                    if Settings.ESP.Boxes then
+                    if SETTINGS.ESP.BOXES then
                         local scale = 2000 / pos.Z
                         esp.Box.Size = Vector2.new(scale, scale * 1.8)
                         esp.Box.Position = Vector2.new(pos.X - scale/2, pos.Y - scale)
-                        esp.Box.Color = color
                         esp.Box.Visible = true
                     else
                         esp.Box.Visible = false
                     end
                     
                     -- Name
-                    if Settings.ESP.Names then
+                    if SETTINGS.ESP.NAMES then
                         esp.Name.Position = Vector2.new(pos.X, pos.Y - scale - 15)
                         esp.Name.Text = player.Name
-                        esp.Name.Color = color
                         esp.Name.Visible = true
                     else
                         esp.Name.Visible = false
                     end
                     
                     -- Distance
-                    if Settings.ESP.Distance then
+                    if SETTINGS.ESP.DISTANCE then
                         esp.Distance.Position = Vector2.new(pos.X, pos.Y + scale/2 + 5)
                         esp.Distance.Text = math.floor(distance) .. " studs"
-                        esp.Distance.Color = Color3.fromRGB(255, 255, 0)
                         esp.Distance.Visible = true
                     else
                         esp.Distance.Visible = false
-                    end
-                    
-                    -- Health
-                    if Settings.ESP.Health then
-                        esp.Health.Position = Vector2.new(pos.X, pos.Y - scale - 30)
-                        esp.Health.Text = "HP: " .. math.floor(player.Character.Humanoid.Health)
-                        esp.Health.Color = Color3.fromRGB(0, 255, 0)
-                        esp.Health.Visible = true
-                    else
-                        esp.Health.Visible = false
-                    end
-                    
-                    -- Tracer
-                    if Settings.ESP.Tracers then
-                        esp.Tracer.From = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y)
-                        esp.Tracer.To = Vector2.new(pos.X, pos.Y)
-                        esp.Tracer.Color = color
-                        esp.Tracer.Visible = true
-                    else
-                        esp.Tracer.Visible = false
                     end
                 else
                     esp.Box.Visible = false
                     esp.Name.Visible = false
                     esp.Distance.Visible = false
-                    esp.Health.Visible = false
-                    esp.Tracer.Visible = false
                 end
+            else
+                esp.Box.Visible = false
+                esp.Name.Visible = false
+                esp.Distance.Visible = false
             end
         else
             esp.Box.Visible = false
             esp.Name.Visible = false
             esp.Distance.Visible = false
-            esp.Health.Visible = false
-            esp.Tracer.Visible = false
         end
     end
 end
-
--- Создание GUI
-local Window = Rayfield:CreateWindow({
-    Name = "NetErrror Cheat v6.0",
-    LoadingTitle = "Загрузка...",
-    LoadingSubtitle = "АВТО-АИМБОТ + ESP",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "NetErrror",
-        FileName = "Config"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "noinvite",
-        RememberJoins = true
-    },
-    KeySystem = false,
-    KeySettings = {
-        Title = "NetErrror",
-        Subtitle = "Key System",
-        Note = "No key required",
-        FileName = "Key",
-        SaveKey = true,
-        GrabKeyFromSite = false,
-        Key = {"Hello"}
-    }
-})
-
--- Вкладка Аимбота
-local AimbotTab = Window:CreateTab("Аимбот", 4483362458)
-
-AimbotTab:CreateToggle({
-    Name = "ВКЛ/ВЫКЛ Аимбот",
-    CurrentValue = Settings.Aimbot.Enabled,
-    Flag = "AimbotToggle",
-    Callback = function(Value)
-        Settings.Aimbot.Enabled = Value
-        UpdateAimbot()
-        Rayfield:Notify({
-            Title = "Аимбот",
-            Content = Value and "Аимбот ВКЛЮЧЕН (автоматический)" or "Аимбот ВЫКЛЮЧЕН",
-            Duration = 2,
-            Image = 4483362458
-        })
-    end
-})
-
-AimbotTab:CreateToggle({
-    Name = "Авто-аимбот (без клавиши)",
-    CurrentValue = Settings.Aimbot.AutoAim,
-    Flag = "AutoAim",
-    Callback = function(Value)
-        Settings.Aimbot.AutoAim = Value
-        UpdateAimbot()
-        Rayfield:Notify({
-            Title = "Режим аимбота",
-            Content = Value and "АВТО-АИМБОТ включен" or "АВТО-АИМБОТ выключен",
-            Duration = 2,
-            Image = 4483362458
-        })
-    end
-})
-
-AimbotTab:CreateSlider({
-    Name = "Плавность",
-    Range = {0.05, 1},
-    Increment = 0.05,
-    Suffix = "",
-    CurrentValue = Settings.Aimbot.Smoothness,
-    Flag = "AimbotSmoothness",
-    Callback = function(Value)
-        Settings.Aimbot.Smoothness = Value
-    end
-})
-
-AimbotTab:CreateSlider({
-    Name = "FOV (радиус поиска)",
-    Range = {10, 500},
-    Increment = 10,
-    Suffix = "px",
-    CurrentValue = Settings.Aimbot.FOV,
-    Flag = "AimbotFOV",
-    Callback = function(Value)
-        Settings.Aimbot.FOV = Value
-    end
-})
-
-AimbotTab:CreateToggle({
-    Name = "Проверка команды",
-    CurrentValue = Settings.Aimbot.TeamCheck,
-    Flag = "TeamCheck",
-    Callback = function(Value)
-        Settings.Aimbot.TeamCheck = Value
-    end
-})
-
-AimbotTab:CreateToggle({
-    Name = "Проверка стен",
-    CurrentValue = Settings.Aimbot.WallCheck,
-    Flag = "WallCheck",
-    Callback = function(Value)
-        Settings.Aimbot.WallCheck = Value
-    end
-})
-
-AimbotTab:CreateDropdown({
-    Name = "Целевая часть",
-    Options = {"Head", "HumanoidRootPart", "Torso"},
-    CurrentOption = Settings.Aimbot.TargetPart,
-    Flag = "TargetPart",
-    Callback = function(Option)
-        Settings.Aimbot.TargetPart = Option
-    end
-})
-
-AimbotTab:CreateButton({
-    Name = "Перезапустить аимбот",
-    Callback = function()
-        UpdateAimbot()
-        Rayfield:Notify({
-            Title = "Аимбот",
-            Content = "Аимбот перезапущен",
-            Duration = 2,
-            Image = 4483362458
-        })
-    end
-})
-
--- Вкладка ESP
-local ESPTab = Window:CreateTab("ESP", 4483362458)
-
-ESPTab:CreateToggle({
-    Name = "ВКЛ/ВЫКЛ ESP",
-    CurrentValue = Settings.ESP.Enabled,
-    Flag = "ESPToggle",
-    Callback = function(Value)
-        Settings.ESP.Enabled = Value
-        Rayfield:Notify({
-            Title = "ESP",
-            Content = Value and "ESP ВКЛЮЧЕН" or "ESP ВЫКЛЮЧЕН",
-            Duration = 2,
-            Image = 4483362458
-        })
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Показывать боксы",
-    CurrentValue = Settings.ESP.Boxes,
-    Flag = "ESPBoxes",
-    Callback = function(Value)
-        Settings.ESP.Boxes = Value
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Показывать имена",
-    CurrentValue = Settings.ESP.Names,
-    Flag = "ESPNames",
-    Callback = function(Value)
-        Settings.ESP.Names = Value
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Показывать расстояние",
-    CurrentValue = Settings.ESP.Distance,
-    Flag = "ESPDistance",
-    Callback = function(Value)
-        Settings.ESP.Distance = Value
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Показывать здоровье",
-    CurrentValue = Settings.ESP.Health,
-    Flag = "ESPHealth",
-    Callback = function(Value)
-        Settings.ESP.Health = Value
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Показывать трассеры",
-    CurrentValue = Settings.ESP.Tracers,
-    Flag = "ESPTracers",
-    Callback = function(Value)
-        Settings.ESP.Tracers = Value
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Цвет по команде",
-    CurrentValue = Settings.ESP.TeamColor,
-    Flag = "ESPTeamColor",
-    Callback = function(Value)
-        Settings.ESP.TeamColor = Value
-    end
-})
-
-ESPTab:CreateSlider({
-    Name = "Макс. расстояние ESP",
-    Range = {100, 5000},
-    Increment = 100,
-    Suffix = "studs",
-    CurrentValue = Settings.ESP.MaxDistance,
-    Flag = "ESPMaxDistance",
-    Callback = function(Value)
-        Settings.ESP.MaxDistance = Value
-    end
-})
-
--- Вкладка информации
-local InfoTab = Window:CreateTab("Информация", 4483362458)
-
-InfoTab:CreateLabel("NetErrror Cheat v6.0")
-InfoTab:CreateLabel("Создано: NetErrror System")
-InfoTab:CreateLabel("Для Roblox на ПК")
-InfoTab:CreateLabel("")
-InfoTab:CreateLabel("Инструкция:")
-InfoTab:CreateLabel("1. Нажми P чтобы открыть GUI")
-InfoTab:CreateLabel("2. Включи аимбот и ESP")
-InfoTab:CreateLabel("3. Аимбот работает АВТОМАТИЧЕСКИ")
-InfoTab:CreateLabel("4. Целит в ближайшего врага")
-InfoTab:CreateLabel("")
-InfoTab:CreateParagraph("Статус:", "Аимбот: " .. (Settings.Aimbot.Enabled and "ВКЛ" or "ВЫКЛ") .. " | ESP: " .. (Settings.ESP.Enabled and "ВКЛ" or "ВЫКЛ"))
 
 -- Инициализация ESP для всех игроков
 for _, player in pairs(Players:GetPlayers()) do
@@ -487,7 +184,9 @@ for _, player in pairs(Players:GetPlayers()) do
 end
 
 Players.PlayerAdded:Connect(function(player)
-    CreateESP(player)
+    if player ~= LocalPlayer then
+        CreateESP(player)
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
@@ -500,24 +199,16 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 -- Главный цикл ESP
-RunService.RenderStepped:Connect(function()
-    UpdateESP()
-end)
+if SETTINGS.ESP.ENABLED then
+    RunService.RenderStepped:Connect(function()
+        UpdateESP()
+    end)
+end
 
--- Запуск аимбота
-UpdateAimbot()
-
--- Автозапуск
-Rayfield:Notify({
-    Title = "NetErrror Cheat v6.0",
-    Content = "Успешно загружен! Аимбот работает АВТОМАТИЧЕСКИ\nОткрывай GUI кнопкой P",
-    Duration = 6,
-    Image = 4483362458
-})
-
+-- Сообщение о запуске
 print("===========================================")
-print("NetErrror Cheat v6.0 загружен!")
-print("Нажми P чтобы открыть GUI")
-print("АВТО-АИМБОТ: ВКЛЮЧЕН (работает без клавиш)")
-print("ESP: ВКЛЮЧЕН")
+print("NetErrror Cheat - ЗАПУЩЕН")
+print("Аимбот: " .. (SETTINGS.AIMBOT.ENABLED and "ВКЛ" or "ВЫКЛ"))
+print("ESP: " .. (SETTINGS.ESP.ENABLED and "ВКЛ" or "ВЫКЛ"))
+print("Проверка стен: " .. (SETTINGS.AIMBOT.WALL_CHECK and "ВКЛ" or "ВЫКЛ"))
 print("===========================================")
